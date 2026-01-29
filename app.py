@@ -1,134 +1,135 @@
-
-
 import streamlit as st
 import pandas as pd
 import os
 
-# Configuração da Página
-st.set_page_config(page_title="Financeiro Star Tec", layout="wide", page_icon="📝")
+# 1. CONFIGURAÇÃO DA PÁGINA
+st.set_page_config(page_title="Financeiro Star Tec", layout="wide", page_icon="🏫")
+
+# 2. LOGO NO TOPO
+# Substitua 'logo.png' pelo nome do arquivo da imagem que você subiu no GitHub
+if os.path.exists('logo.png'):
+    st.image('logo.png', width=200)
+else:
+    st.title("🏫 Star Tec - Polo Ubatã")
 
 # --- CSS PARA STATUS ---
 st.markdown("""
     <style>
-    .pago { color: #2ecc71; font-weight: bold; background-color: #e8f8f5; padding: 5px; border-radius: 5px; }
-    .pendente { color: #e74c3c; font-weight: bold; background-color: #fdedec; padding: 5px; border-radius: 5px; }
-    .card { border: 1px solid #ddd; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
+    .pago { color: white; background-color: #2ecc71; padding: 4px 8px; border-radius: 5px; font-weight: bold; }
+    .pendente { color: white; background-color: #e74c3c; padding: 4px 8px; border-radius: 5px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CARREGAMENTO DE DADOS (COM MEMÓRIA DE SESSÃO) ---
+# --- FUNÇÃO DE CARREGAMENTO ---
 @st.cache_data
-def carregar_planilha():
+def carregar_dados_iniciais():
     df_alunos = pd.read_excel("planilha atualizada 2026.xlsx", sheet_name='Alunos', skiprows=3)
     df_alunos = df_alunos.dropna(subset=['Aluno'])
     
     meses = ["JANEIRO.2026", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
              "Julho", "Agosto", "Setembro", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
     
-    pagamentos = {}
+    financeiro = {}
     for m in meses:
         try:
-            pagamentos[m] = pd.read_excel("planilha atualizada 2026.xlsx", sheet_name=m, skiprows=1)
-        except: continue
-    return df_alunos, pagamentos
+            financeiro[m] = pd.read_excel("planilha atualizada 2026.xlsx", sheet_name=m, skiprows=1)
+        except:
+            financeiro[m] = pd.DataFrame(columns=['Data', 'Lançamento', 'FORMA', 'Valor', 'Saldo'])
+    return df_alunos, financeiro
 
-# Inicializa os dados na memória do navegador para permitir edição
-if 'df_alunos' not in st.session_state:
-    df_al, pg_meses = carregar_planilha()
-    st.session_state.df_alunos = df_al
-    st.session_state.pg_meses = pg_meses
+# --- GERENCIAMENTO DE ESTADO (MEMÓRIA) ---
+if 'dados_alunos' not in st.session_state:
+    al, fin = carregar_dados_iniciais()
+    st.session_state.dados_alunos = al
+    st.session_state.dados_financeiros = fin
 
 if 'aluno_foco' not in st.session_state:
     st.session_state.aluno_foco = None
 
-# --- NAVEGAÇÃO LATERAL ---
-st.sidebar.title("💳 Gestão Star Tec")
-if st.sidebar.button("⬅️ Voltar para Lista Principal"):
+# --- NAVEGAÇÃO ---
+st.sidebar.title("Menu de Gestão")
+if st.sidebar.button("🏠 Início / Lista de Alunos"):
     st.session_state.aluno_foco = None
 
-menu = st.sidebar.radio("Ir para:", ["📋 Lista e Busca", "➕ Cadastrar Aluno", "📈 Resumo Mensal"])
+menu = st.sidebar.radio("Ir para:", ["📋 Painel de Controle", "➕ Adicionar Aluno"])
 
-# --- TELA: DETALHE E EDIÇÃO (VIDA DO ALUNO) ---
+# --- TELA: VIDA DO ALUNO (EDIÇÃO COMPLETA) ---
 if st.session_state.aluno_foco:
-    nome_aluno = st.session_state.aluno_foco
-    st.header(f"⚙️ Editando Ficha: {nome_aluno}")
+    aluno_nome = st.session_state.aluno_foco
+    st.header(f"👤 Ficha Financeira: {aluno_nome}")
     
-    # Busca o índice do aluno para salvar a edição depois
-    idx = st.session_state.df_alunos[st.session_state.df_alunos['Aluno'] == nome_aluno].index[0]
-    aluno_data = st.session_state.df_alunos.loc[idx]
+    # Busca dados atuais na memória
+    idx = st.session_state.dados_alunos[st.session_state.dados_alunos['Aluno'] == aluno_nome].index[0]
+    info = st.session_state.dados_alunos.loc[idx]
 
-    tab1, tab2 = st.tabs(["📄 Dados Cadastrais", "💰 Financeiro Detalhado"])
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Dados do Cadastro")
+        novo_nome = st.text_input("Nome", value=info['Aluno'])
+        novo_contato = st.text_input("Contato", value=info['Contato'])
+        if st.button("Salvar Dados Cadastrais"):
+            st.session_state.dados_alunos.at[idx, 'Aluno'] = novo_nome
+            st.session_state.dados_alunos.at[idx, 'Contato'] = novo_contato
+            st.success("Cadastro atualizado!")
 
-    with tab1:
-        with st.form("edicao_aluno"):
-            col1, col2 = st.columns(2)
-            novo_nome = col1.text_input("Nome do Aluno", value=aluno_data['Aluno'])
-            novo_zap = col1.text_input("WhatsApp", value=aluno_data['Contato'])
-            novo_venc = col2.selectbox("Vencimento", ["DIA 05", "DIA 10", "DIA 15", "DIA 20", "DIA 30"], 
-                                      index=["DIA 05", "DIA 10", "DIA 15", "DIA 20", "DIA 30"].index(str(aluno_data['Vencimento']).upper() if pd.notna(aluno_data['Vencimento']) else "DIA 15"))
-            novo_doc = col2.selectbox("Pendência Doc?", ["--", "SIM", "Cursando"], index=0)
+    with col2:
+        st.subheader("Situação de Mensalidades")
+        # Lista os meses e permite dar baixa
+        for mes in st.session_state.dados_financeiros.keys():
+            df_mes = st.session_state.dados_financeiros[mes]
+            # Verifica se o aluno consta como pago no mês
+            pago = df_mes[df_mes['Lançamento'].astype(str).str.upper().str.contains(aluno_nome.split()[0].upper(), na=False)]
             
-            if st.form_submit_button("💾 Salvar Alterações no Cadastro"):
-                st.session_state.df_alunos.at[idx, 'Aluno'] = novo_nome
-                st.session_state.df_alunos.at[idx, 'Contato'] = novo_zap
-                st.session_state.df_alunos.at[idx, 'Vencimento'] = novo_venc
-                st.success("Alterações salvas com sucesso!")
-
-    with tab2:
-        st.subheader("Histórico de Pagamentos 2026")
-        st.write("Aqui você pode dar baixa em meses pendentes:")
-        
-        for mes in st.session_state.pg_meses.keys():
-            pagou = st.session_state.pg_meses[mes][st.session_state.pg_meses[mes]['Lançamento'].astype(str).str.contains(nome_aluno.split()[0], case=False, na=False)]
+            c_mes, c_status, c_acao = st.columns([2, 2, 2])
+            c_mes.write(f"**{mes}**")
             
-            c1, c2, c3 = st.columns([2, 2, 1])
-            c1.write(f"**{mes}**")
-            
-            if not pagou.empty:
-                c2.markdown(f"<span class='pago'>✅ PAGO (R$ {pagou.iloc[0]['Valor']})</span>", unsafe_allow_html=True)
-                if c3.button("Estornar", key=f"est_{mes}"):
-                    st.warning("Função de estorno acionada.")
+            if not pago.empty:
+                c_status.markdown('<span class="pago">PAGO</span>', unsafe_allow_html=True)
+                if c_acao.button("Remover Pagamento", key=f"del_{mes}"):
+                    # Remove a linha de pagamento da memória
+                    st.session_state.dados_financeiros[mes] = df_mes[~df_mes['Lançamento'].astype(str).str.upper().str.contains(aluno_nome.split()[0].upper())]
+                    st.rerun()
             else:
-                c2.markdown("<span class='pendente'>❌ PENDENTE</span>", unsafe_allow_html=True)
-                if c3.button("Dar Baixa", key=f"bx_{mes}"):
-                    st.success(f"Pagamento de {mes} registrado para {nome_aluno}!")
-                    # Aqui você adicionaria a lógica de inserir a linha no dataframe do mês
+                c_status.markdown('<span class="pendente">PENDENTE</span>', unsafe_allow_html=True)
+                if c_acao.button("Dar Baixa ✅", key=f"baixa_{mes}"):
+                    # Adiciona uma nova linha de pagamento na memória
+                    nova_baixa = pd.DataFrame({
+                        'Data': [pd.Timestamp.now().strftime('%d/%m/%Y')],
+                        'Lançamento': [f"Mensalidade {aluno_nome}"],
+                        'FORMA': ['SISTEMA'],
+                        'Valor': [200.0], # Valor padrão
+                        'Saldo': [0.0]
+                    })
+                    st.session_state.dados_financeiros[mes] = pd.concat([df_mes, nova_baixa], ignore_index=True)
+                    st.success(f"Baixa dada em {mes}!")
+                    st.rerun()
 
 # --- TELA: LISTA PRINCIPAL ---
-elif menu == "📋 Lista e Busca":
-    st.header("👥 Alunos do Polo Ubatã")
+elif menu == "📋 Painel de Controle":
+    st.header("Lista de Alunos e Contatos")
     
-    busca = st.text_input("🔍 Buscar por nome do aluno...", "").upper()
-    
-    # Filtro de busca
-    df_exibir = st.session_state.df_alunos
+    busca = st.text_input("🔍 Pesquisar Aluno:").upper()
+    df_lista = st.session_state.dados_alunos
     if busca:
-        df_exibir = df_exibir[df_exibir['Aluno'].str.upper().str.contains(busca)]
+        df_lista = df_lista[df_lista['Aluno'].str.upper().str.contains(busca)]
 
-    # Cabeçalho da Tabela customizada
-    st.markdown("---")
-    c1, c2, c3 = st.columns([3, 2, 1])
-    c1.write("**NOME**")
-    c2.write("**CONTATO**")
-    c3.write("**AÇÃO**")
-    
-    for _, row in df_exibir.iterrows():
-        col_n, col_z, col_b = st.columns([3, 2, 1])
-        col_n.write(row['Aluno'])
-        col_z.write(row['Contato'])
-        if col_b.button("Editar / Ver Vida", key=f"foco_{row['Aluno']}"):
+    st.write("---")
+    for i, row in df_lista.iterrows():
+        c1, c2, c3 = st.columns([3, 2, 1])
+        c1.write(f"**{row['Aluno']}**")
+        c2.write(row['Contato'])
+        if c3.button("Ver Vida / Editar", key=f"f_{i}"):
             st.session_state.aluno_foco = row['Aluno']
             st.rerun()
+        st.write("---")
 
-# --- TELA: NOVO CADASTRO ---
-elif menu == "➕ Cadastrar Aluno":
-    st.header("Adicionar Novo Estudante")
-    # Formulário de cadastro que insere no dataframe da sessão
-    with st.form("cad_novo"):
-        n = st.text_input("Nome Completo")
-        z = st.text_input("WhatsApp")
-        v = st.number_input("Valor Mensalidade", value=200)
-        if st.form_submit_button("Cadastrar"):
-            new_row = {"Aluno": n, "Contato": z, "Mensalidade": v, "Vencimento": "DIA 15"}
-            st.session_state.df_alunos = pd.concat([st.session_state.df_alunos, pd.DataFrame([new_row])], ignore_index=True)
-            st.success(f"{n} cadastrado com sucesso!")
+# --- TELA: ADICIONAR ALUNO ---
+elif menu == "➕ Adicionar Aluno":
+    st.header("Novo Cadastro")
+    with st.form("novo"):
+        n = st.text_input("Nome")
+        c = st.text_input("WhatsApp")
+        if st.form_submit_button("Salvar"):
+            novo_df = pd.DataFrame({'Aluno': [n], 'Contato': [c]})
+            st.session_state.dados_alunos = pd.concat([st.session_state.dados_alunos, novo_df], ignore_index=True)
+            st.success("Aluno adicionado!")
