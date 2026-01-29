@@ -338,12 +338,11 @@ elif pagina == "👥 Lista de Alunos":
         st.subheader("💳 Calendário Financeiro")
         tab25, tab26 = st.tabs(["Histórico 2025", "ANO 2026"])
 
-        # --- FUNÇÃO DE GRADE (4 MESES POR LINHA) ---
-        def render_meses_grade(lista_meses):
-            colunas = st.columns(4) # Cria 4 colunas fixas
+        # --- FUNÇÃO DE GRADE (CORRIGIDA COM "ANO") ---
+        def render_meses_grade(lista_meses, ano_referencia):
+            colunas = st.columns(4) 
             
             for index, mes in enumerate(lista_meses):
-                # Distribui nas colunas usando %
                 with colunas[index % 4]:
                     with st.container(border=True):
                         st.markdown(f"### {mes}")
@@ -352,12 +351,14 @@ elif pagina == "👥 Lista de Alunos":
                         p_nome = str(st.session_state.aluno_selecionado).split()[0]
                         pg = df[df['Lançamento'].astype(str).str.contains(p_nome, case=False, na=False)]
                         
+                        # --- ADICIONAMOS O ANO NO FINAL DAS 'KEYS' ---
                         if not pg.empty:
                             # PAGO
                             valor = pg.iloc[0]['Valor']
                             st.markdown('<p class="pago-texto">✅ PAGO</p>', unsafe_allow_html=True)
                             st.write(f"**R$ {valor}**")
-                            if st.button("Desfazer", key=f"d_{mes}"):
+                            # Key única: d_Janeiro_2026
+                            if st.button("Desfazer", key=f"d_{mes}_{ano_referencia}"):
                                 st.session_state.db_fin[mes] = df.drop(pg.index)
                                 st.rerun()
                         else:
@@ -366,17 +367,25 @@ elif pagina == "👥 Lista de Alunos":
                             st.caption(f"Vence: {dados['Vencimento']}")
                             
                             with st.popover("💰 Pagar"):
-                                val = st.number_input("Valor", value=val_m, key=f"v{mes}")
-                                if st.button("Confirmar", key=f"ok{mes}"):
-                                    novo = {'Data': datetime.now().strftime('%d/%m/%Y'), 'Lançamento': f"Mensalidade {st.session_state.aluno_selecionado}", 'Valor': val, 'FORMA': 'PIX'}
+                                # Keys únicas também para os inputs
+                                val = st.number_input("Valor", value=val_m, key=f"v_{mes}_{ano_referencia}")
+                                
+                                if st.button("Confirmar", key=f"ok_{mes}_{ano_referencia}"):
+                                    novo = {
+                                        'Data': datetime.now().strftime('%d/%m/%Y'), 
+                                        'Lançamento': f"Mensalidade {st.session_state.aluno_selecionado}", 
+                                        'Valor': val, 
+                                        'FORMA': 'PIX'
+                                    }
                                     st.session_state.db_fin[mes] = pd.concat([df, pd.DataFrame([novo])], ignore_index=True)
                                     st.rerun()
-                        st.write("") # Espaçamento
+                        st.write("") 
 
+        # --- AQUI VOCÊ PASSA O ANO COMO PARÂMETRO ---
         with tab25:
             st.write("### 📅 Ano 2025")
-            render_meses_grade(st.session_state.m25)
+            render_meses_grade(st.session_state.m25, "2025") # Passando "2025"
             
         with tab26:
             st.write("### 📅 Ano 2026")
-            render_meses_grade(st.session_state.m26)
+            render_meses_grade(st.session_state.m26, "2026") # Passando "2026"
