@@ -22,14 +22,14 @@ st.markdown("""
 @st.cache_data
 def carregar_tudo():
     file = "planilha atualizada 2026.xlsx"
-    # Definição das colunas padrão
+    # Definição das colunas padrão para evitar erros
     cols_alunos = ['Aluno', 'Contato', 'Vencimento', 'Mensalidade', 'Data da Matricula ', 'Bolsita', 'Penden. Docum', 'Qual Documento?', 'Valor Matricula']
     
     if not os.path.exists(file):
         return pd.DataFrame(columns=cols_alunos), {}, [], []
 
     df_alunos = pd.read_excel(file, sheet_name='Alunos', skiprows=3)
-    # Garante que todas as colunas existem
+    # Garante que todas as colunas existem no DataFrame
     for col in cols_alunos:
         if col not in df_alunos.columns:
             df_alunos[col] = None
@@ -48,7 +48,7 @@ def carregar_tudo():
             
     return df_alunos, financas, meses_2025, meses_2026
 
-# Inicialização da Memória
+# Inicialização da Memória (Session State)
 if 'db_alunos' not in st.session_state:
     a, f, m25, m26 = carregar_tudo()
     st.session_state.db_alunos = a
@@ -147,6 +147,7 @@ elif pagina == "👥 Lista de Alunos":
         st.header(f"Pasta do Aluno: {dados['Aluno']}")
 
         # --- SEÇÃO DE DADOS (VISUALIZAÇÃO + EDIÇÃO) ---
+        # Aqui está a mágica: um Expander que contém o formulário de edição
         with st.expander("📝 Dados Pessoais e Matrícula (Clique para Editar)", expanded=False):
             with st.form("editar_dados"):
                 ec1, ec2 = st.columns(2)
@@ -154,12 +155,11 @@ elif pagina == "👥 Lista de Alunos":
                 novo_contato = ec2.text_input("WhatsApp", value=dados['Contato'])
                 
                 ec3, ec4 = st.columns(2)
-                # Tenta encontrar o index do vencimento atual, se não, usa padrão
                 opcoes_venc = ["DIA 05", "DIA 10", "DIA 15", "DIA 20", "DIA 30"]
                 venc_atual = dados['Vencimento'] if dados['Vencimento'] in opcoes_venc else "DIA 15"
                 novo_venc = ec3.selectbox("Vencimento", opcoes_venc, index=opcoes_venc.index(venc_atual))
                 
-                nova_mensalidade = ec4.number_input("Mensalidade (R$)", value=float(dados['Mensalidade']) if pd.notnull(dados['Mensalidade']) else 200.0)
+                nova_mensalidade = ec4.number_input("Mensalidade (R$)", value=float(dados['Mensalidade']) if pd.notnull(dados['Mensalidade']) and str(dados['Mensalidade']).replace('.','',1).isdigit() else 200.0)
                 
                 ec5, ec6 = st.columns(2)
                 novo_bolsista = ec5.selectbox("Bolsista?", ["NÃO", "SIM"], index=0 if str(dados.get('Bolsita','')).upper() != 'SIM' else 1)
@@ -167,6 +167,7 @@ elif pagina == "👥 Lista de Alunos":
                 obs_doc = ec6.text_input("Documento Pendente?", value=dados.get('Qual Documento?', ''))
                 
                 if st.form_submit_button("💾 Salvar Alterações"):
+                    # Atualiza o DataFrame na memória
                     st.session_state.db_alunos.at[idx_aluno, 'Aluno'] = novo_nome
                     st.session_state.db_alunos.at[idx_aluno, 'Contato'] = novo_contato
                     st.session_state.db_alunos.at[idx_aluno, 'Vencimento'] = novo_venc
@@ -175,7 +176,7 @@ elif pagina == "👥 Lista de Alunos":
                     st.session_state.db_alunos.at[idx_aluno, 'Qual Documento?'] = obs_doc
                     st.session_state.db_alunos.at[idx_aluno, 'Penden. Docum'] = "SIM" if obs_doc else "NÃO"
                     
-                    # Se mudou o nome, atualiza a variável de seleção para não quebrar a tela
+                    # Atualiza o nome selecionado caso tenha mudado
                     st.session_state.aluno_selecionado = novo_nome
                     st.success("Dados atualizados com sucesso!")
                     st.rerun()
@@ -194,7 +195,7 @@ elif pagina == "👥 Lista de Alunos":
         def renderizar_financeiro(lista_meses):
             for mes in lista_meses:
                 df_mes = st.session_state.db_fin[mes]
-                # Busca flexível pelo primeiro nome para não falhar
+                # Busca flexível pelo primeiro nome
                 nome_busca = st.session_state.aluno_selecionado.split()[0]
                 pagamento = df_mes[df_mes['Lançamento'].astype(str).str.upper().str.contains(nome_busca.upper(), na=False)]
                 
@@ -210,7 +211,7 @@ elif pagina == "👥 Lista de Alunos":
                 else:
                     col_status.markdown(f"""<div class="devendo-card">❌ <b>PENDENTE</b></div>""", unsafe_allow_html=True)
                     with col_acao.popover("💰 Pagar"):
-                        val = st.number_input("Valor", value=float(dados['Mensalidade']), key=f"v_{mes}")
+                        val = st.number_input("Valor", value=float(dados['Mensalidade']) if isinstance(dados['Mensalidade'], (int, float)) else 200.0, key=f"v_{mes}")
                         dt = st.date_input("Data", key=f"d_{mes}")
                         fm = st.selectbox("Forma", ["PIX", "Dinheiro"], key=f"f_{mes}")
                         if st.button("Confirmar", key=f"c_{mes}"):
