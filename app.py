@@ -108,7 +108,7 @@ elif pagina == "➕ Novo Aluno":
         nome = c1.text_input("Nome Completo")
         contato = c2.text_input("WhatsApp")
         c3, c4 = st.columns(2)
-        venc = c3.selectbox("Dia Vencimento", ["DIA 05", "DIA 10", "DIA 15", "DIA 20", "DIA 30"])
+        venc = c3.selectbox("Dia Vencimento", ["DIA 05", "DIA 10", "DIA 15", "DIA 20"])
         mensalidade = c4.number_input("Valor Mensalidade", value=200.0)
         
         if st.form_submit_button("✅ Salvar Novo Aluno"):
