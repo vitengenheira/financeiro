@@ -1,19 +1,8 @@
-# Importa a biblioteca Streamlit, usada para criar o site/interface visual
 import streamlit as st
-
-# Importa a biblioteca Pandas, essencial para mexer com tabelas (DataFrames)
 import pandas as pd
-
-# Importa a biblioteca OS, para verificar se arquivos existem no computador
 import os
-
-# Importa datetime para saber que dia é hoje (usado nos pagamentos e notificações)
 from datetime import datetime
-
-# Importa IO para lidar com entrada/saída de dados (necessário para o botão de download)
 import io
-
-# Importa XlsxWriter, o "motor" que cria o arquivo Excel quando você clica em baixar
 import xlsxwriter
 
 # --- 1. CONFIGURAÇÃO VISUAL ---
@@ -54,7 +43,7 @@ def carregar_tudo():
     file = "planilha atualizada 2026.xlsx"
     
     # Define a lista de colunas que a tabela de Alunos OBRIGATORIAMENTE deve ter
-    cols_alunos = ['Aluno', 'Contato', 'Vencimento', 'Mensalidade', 'Data da Matricula ', 'Bolsita', 'Penden. Docum', 'Qual Documento?', 'Valor Matricula']
+    cols_alunos = ['Aluno', 'Contato', 'Vencimento', 'Mensalidade', 'Data da Matricula ', 'Bolsita', 'Pendente de Documento', 'Qual Documento?', 'Valor Matricula']
     
     # Verifica: Se o arquivo NÃO existe na pasta...
     if not os.path.exists(file):
@@ -74,13 +63,10 @@ def carregar_tudo():
         
         # --- DEFINIÇÃO DOS MESES ---
         # Lista manual dos meses de 2025 para manter o histórico
-        meses_2025 = ["Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
+        meses_2025 = ["Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
         
         # Lista oficial dos meses de 2026 que queremos no sistema
-        meses_2026 = [
-            "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", 
-            "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"
-        ]
+        meses_2026 = ["Janeiro","Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro",  "Outubro", "Novembro", "Dezembro"]
         
         # Cria um dicionário vazio para guardar as tabelas de cada mês
         financas = {}
@@ -94,8 +80,6 @@ def carregar_tudo():
         # Loop: Para cada mês que definimos nas listas acima...
         for m in all_months:
             nome_aba = None
-            # Cria variações possíveis do nome (ex: JANEIRO, Janeiro, JANEIRO.2026) para tentar achar na planilha
-            possiveis = [m, m.upper(), m.capitalize(), f"{m}.2026", f"{m.upper()}.2026"]
             
             # Testa cada variação
             for p in possiveis:
