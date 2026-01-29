@@ -14,15 +14,18 @@ st.markdown("""
     h1, h2, h3 { color: #004a99; }
     .stButton>button { background-color: #004a99; color: white; border-radius: 8px; width: 100%; font-weight: bold; }
     
-    /* Cards Financeiros Modernos */
-    .card-receita { background-color: #d1f2eb; border: 1px solid #2ecc71; padding: 20px; border-radius: 10px; color: #145a32; text-align: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
-    .card-despesa { background-color: #fadbd8; border: 1px solid #e74c3c; padding: 20px; border-radius: 10px; color: #7b241c; text-align: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
-    .card-saldo { background-color: #d6eaf8; border: 1px solid #3498db; padding: 20px; border-radius: 10px; color: #154360; text-align: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+    /* Cards Financeiros */
+    .card-receita { background-color: #d1f2eb; border: 1px solid #2ecc71; padding: 20px; border-radius: 10px; color: #145a32; text-align: center; }
+    .card-despesa { background-color: #fadbd8; border: 1px solid #e74c3c; padding: 20px; border-radius: 10px; color: #7b241c; text-align: center; }
+    .card-saldo { background-color: #d6eaf8; border: 1px solid #3498db; padding: 20px; border-radius: 10px; color: #154360; text-align: center; }
     
-    /* Status e Alertas */
-    .pago-texto { color: #27ae60; font-weight: bold; background-color: #eafaf1; padding: 4px 8px; border-radius: 5px; border: 1px solid #27ae60; display: inline-block; }
-    .pendente-texto { color: #c0392b; font-weight: bold; background-color: #fdedec; padding: 4px 8px; border-radius: 5px; border: 1px solid #c0392b; display: inline-block; }
-    .alerta-hoje { background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; margin-bottom: 10px; border-radius: 5px; }
+    /* Alertas e Status */
+    .alerta-hoje { background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; margin-bottom: 10px; }
+    .pago-texto { color: #27ae60; font-weight: bold; font-size: 1.1em; }
+    .pendente-texto { color: #c0392b; font-weight: bold; font-size: 1.1em; }
+    
+    /* Ajuste de Container */
+    [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -30,6 +33,8 @@ st.markdown("""
 @st.cache_data
 def carregar_tudo():
     file = "planilha atualizada 2026.xlsx"
+    
+    # Lista completa de colunas para o cadastro detalhado
     cols_alunos = [
         'Aluno', 'Contato', 'Vencimento', 'Mensalidade', 
         'Data da Matricula ', 'Valor Matricula',
@@ -41,13 +46,17 @@ def carregar_tudo():
         return pd.DataFrame(columns=cols_alunos), {}, [], []
 
     try:
+        # Carrega Alunos
         df_alunos = pd.read_excel(file, sheet_name='Alunos', skiprows=3)
         df_alunos.columns = df_alunos.columns.str.strip()
         df_alunos = df_alunos.dropna(subset=['Aluno'])
         
+        # Garante que todas as colunas novas existam
         for col in cols_alunos:
-            if col not in df_alunos.columns: df_alunos[col] = None
+            if col not in df_alunos.columns:
+                df_alunos[col] = None
         
+        # Definição dos Meses
         meses_2025 = ["Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
         meses_2026 = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
         
@@ -59,7 +68,8 @@ def carregar_tudo():
         
         for m in all_months:
             nome_aba = None
-            possiveis = [m, m.upper(), m.capitalize(), f"{m}.2026", f"{m.upper()}.2026", f"{m}_26"]
+            # Tenta encontrar variações do nome da aba
+            possiveis = [m, m.upper(), m.capitalize(), f"{m}.2026", f"{m.upper()}.2026"]
             for p in possiveis:
                 if p in sheet_names:
                     nome_aba = p
@@ -95,11 +105,14 @@ with st.sidebar:
     if os.path.exists('logo.png'): st.image('logo.png', use_container_width=True)
     st.title("Menu Gestão")
     
+    # Navegação com KEY para permitir redirecionamento automático
     pagina = st.radio("Navegar:", 
                       ["🔔 Painel do Dia", "💰 Fluxo de Caixa (Despesas)", "👥 Lista de Alunos", "➕ Novo Aluno"],
                       key="navegacao")
     
     st.markdown("---")
+    
+    # Botão de Relatório para Coordenação
     if st.button("📥 BAIXAR RELATÓRIO MENSAL"):
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -107,6 +120,7 @@ with st.sidebar:
             for m, df in st.session_state.db_fin.items():
                 df.to_excel(writer, sheet_name=m, startrow=1, index=False)
                 
+                # Adiciona totais no final da planilha
                 workbook = writer.book
                 worksheet = writer.sheets[m]
                 fmt = workbook.add_format({'bold': True})
@@ -129,6 +143,7 @@ if pagina == "🔔 Painel do Dia":
     hoje = datetime.now()
     st.header(f"📅 Visão Geral - {hoje.strftime('%d/%m/%Y')}")
     
+    # 1. Alertas de Vencimento
     st.subheader("🔔 Vencimentos de Hoje")
     dia_atual = hoje.day
     tem_alerta = False
@@ -149,6 +164,7 @@ if pagina == "🔔 Painel do Dia":
 
     st.markdown("---")
     
+    # 2. Pendências do Mês Atual (Com Redirecionamento)
     idx_mes = hoje.month - 1
     meses_oficiais = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
     nome_mes_atual = meses_oficiais[idx_mes]
@@ -163,6 +179,7 @@ if pagina == "🔔 Painel do Dia":
             nome_aluno = row['Aluno']
             primeiro_nome = str(nome_aluno).split()[0]
             
+            # Verifica pagamento
             pagou = df_mes_atual[df_mes_atual['Lançamento'].astype(str).str.contains(primeiro_nome, case=False, na=False)]
             
             if pagou.empty:
@@ -171,19 +188,23 @@ if pagina == "🔔 Painel do Dia":
                     c1, c2, c3 = st.columns([3, 2, 2])
                     c1.markdown(f"🔴 **{nome_aluno}**")
                     c2.text(f"Dia: {row['Vencimento']}")
+                    
+                    # BOTÃO MÁGICO QUE LEVA PARA A PASTA DO ALUNO
                     if c3.button("Cobrar / Abrir Pasta", key=f"cobrar_{idx}"):
                         st.session_state.aluno_selecionado = nome_aluno
-                        st.session_state.navegacao = "👥 Lista de Alunos"
-                        st.rerun()
+                        st.session_state.navegacao = "👥 Lista de Alunos" # Troca a aba
+                        st.rerun() # Atualiza a tela
+        
         if pendentes_count == 0: st.success(f"Tudo pago em {nome_mes_atual}!")
-    else: st.warning(f"Mês {nome_mes_atual} ainda não iniciado.")
+    else: st.warning(f"Mês {nome_mes_atual} ainda não iniciado no sistema.")
 
-# --- PÁGINA 2: FLUXO DE CAIXA (NOVA TABELA) ---
+# --- PÁGINA 2: FLUXO DE CAIXA ---
 elif pagina == "💰 Fluxo de Caixa (Despesas)":
     st.header("💰 Controle Financeiro do Mês")
     mes_atual = st.selectbox("Selecione o Mês:", st.session_state.m26)
     df_caixa = st.session_state.db_fin[mes_atual]
     
+    # Cálculos
     entradas = df_caixa[df_caixa['Valor'] > 0]['Valor'].sum()
     saidas = df_caixa[df_caixa['Valor'] < 0]['Valor'].sum()
     
@@ -193,57 +214,18 @@ elif pagina == "💰 Fluxo de Caixa (Despesas)":
     c3.markdown(f'<div class="card-saldo"><h3>Saldo</h3>R$ {entradas+saidas:,.2f}</div>', unsafe_allow_html=True)
     
     st.markdown("---")
+    with st.expander("🔴 LANÇAR DESPESA (Gasto)", expanded=True):
+        with st.form("desp"):
+            d1, d2 = st.columns(2)
+            desc = d1.text_input("Descrição (Ex: Luz, Internet)")
+            val = d2.number_input("Valor R$", min_value=0.0)
+            if st.form_submit_button("Lançar"):
+                novo = {'Data': datetime.now().strftime('%d/%m/%Y'), 'Lançamento': f"DESPESA: {desc}", 'Valor': -val, 'FORMA': 'CAIXA'}
+                st.session_state.db_fin[mes_atual] = pd.concat([df_caixa, pd.DataFrame([novo])], ignore_index=True)
+                st.rerun()
     
-    # --- ÁREA DE LANÇAMENTO ---
-    col_lancar, col_vazia = st.columns([1, 1])
-    with col_lancar:
-        with st.expander("➕ Adicionar Gasto / Despesa", expanded=False):
-            with st.form("desp"):
-                desc = st.text_input("Descrição (Ex: Luz, Internet, Material)")
-                val = st.number_input("Valor do Gasto (R$)", min_value=0.0, step=10.0)
-                dt_gasto = st.date_input("Data", datetime.now())
-                
-                if st.form_submit_button("🔴 Registrar Saída"):
-                    novo = {
-                        'Data': dt_gasto.strftime('%d/%m/%Y'), 
-                        'Lançamento': f"DESPESA: {desc}", 
-                        'Valor': -val, 
-                        'FORMA': 'CAIXA'
-                    }
-                    st.session_state.db_fin[mes_atual] = pd.concat([df_caixa, pd.DataFrame([novo])], ignore_index=True)
-                    st.success("Despesa registrada!")
-                    st.rerun()
-
-    # --- TABELA BONITA ---
-    st.subheader(f"Extrato: {mes_atual}")
-    
-    # Preparar dados para ficar bonito
-    df_exibir = df_caixa.copy()
-    if not df_exibir.empty:
-        # Cria coluna de Tipo para o ícone
-        df_exibir['Tipo'] = df_exibir['Valor'].apply(lambda x: '🟢 Receita' if x > 0 else '🔴 Despesa')
-        # Converte data para formato data real para ordenar
-        df_exibir['Data'] = pd.to_datetime(df_exibir['Data'], dayfirst=True, errors='coerce')
-        # Seleciona ordem
-        df_exibir = df_exibir[['Data', 'Tipo', 'Lançamento', 'FORMA', 'Valor']]
-        
-        st.dataframe(
-            df_exibir,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Data": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
-                "Tipo": st.column_config.TextColumn("Categoria", width="small"),
-                "Lançamento": st.column_config.TextColumn("Descrição", width="large"),
-                "FORMA": st.column_config.TextColumn("Forma", width="small"),
-                "Valor": st.column_config.NumberColumn(
-                    "Valor (R$)",
-                    format="R$ %.2f"
-                )
-            }
-        )
-    else:
-        st.info("Nenhum lançamento neste mês.")
+    st.subheader("Extrato")
+    st.dataframe(df_caixa, use_container_width=True)
 
 # --- PÁGINA 3: NOVO ALUNO ---
 elif pagina == "➕ Novo Aluno":
@@ -258,7 +240,7 @@ elif pagina == "➕ Novo Aluno":
         
         c3, c4 = st.columns(2)
         vm = c3.number_input("Valor Matrícula", value=50.0)
-        dm = c4.text_input("Data Matrícula", value=datetime.now().strftime('%d/%m/%Y'))
+        dm = c4.text_input("Data Matrícula (DD/MM/AAAA)", value=datetime.now().strftime('%d/%m/%Y'))
         
         if st.form_submit_button("Salvar"):
             novo = {
@@ -287,6 +269,7 @@ elif pagina == "👥 Lista de Alunos":
                     st.session_state.aluno_selecionado = row['Aluno']
                     st.rerun()
     else:
+        # --- PASTA DO ALUNO ---
         nome_aluno = st.session_state.aluno_selecionado
         if st.button("⬅️ Voltar"):
             st.session_state.aluno_selecionado = None
@@ -297,37 +280,44 @@ elif pagina == "👥 Lista de Alunos":
         
         st.title(f"Aluno: {dados['Aluno']}")
         
-        with st.expander("📝 Editar Dados do Aluno", expanded=True):
+        # --- EDIÇÃO COMPLETA (EXPANDER) ---
+        with st.expander("📝 Editar Dados (Clique Aqui)", expanded=True):
             with st.form("edit_completo"):
-                st.subheader("Dados Pessoais")
-                c_a, c_b = st.columns(2)
-                novo_nome = c_a.text_input("Nome", value=dados['Aluno'])
-                novo_contato = c_b.text_input("Zap", value=dados['Contato'])
+                st.subheader("Informações Pessoais")
+                col_a, col_b = st.columns(2)
+                novo_nome = col_a.text_input("Nome", value=dados['Aluno'])
+                novo_contato = col_b.text_input("Zap", value=dados['Contato'])
                 
-                c_c, c_d = st.columns(2)
-                ops_venc = ["DIA 05", "DIA 10", "DIA 15", "DIA 20", "DIA 30"]
-                idx_v = ops_venc.index(dados['Vencimento']) if dados['Vencimento'] in ops_venc else 2
-                novo_venc = c_c.selectbox("Vencimento", ops_venc, index=idx_v)
+                col_c, col_d = st.columns(2)
+                opcoes_venc = ["DIA 05", "DIA 10", "DIA 15", "DIA 20", "DIA 30"]
+                idx_v = opcoes_venc.index(dados['Vencimento']) if dados['Vencimento'] in opcoes_venc else 2
+                novo_venc = col_c.selectbox("Vencimento", opcoes_venc, index=idx_v)
                 
-                try: val_men = float(dados['Mensalidade'])
-                except: val_men = 200.0
-                novo_mensal = c_d.number_input("Mensalidade", value=val_men)
+                try: val_m = float(dados['Mensalidade'])
+                except: val_m = 200.0
+                novo_mensal = col_d.number_input("Mensalidade", value=val_m)
                 
-                st.subheader("Acadêmico")
-                c_e, c_f = st.columns(2)
-                novo_data_mat = c_e.text_input("Data Matrícula", value=dados.get('Data da Matricula ', ''))
-                novo_val_mat = c_f.number_input("Valor Matrícula", value=float(dados.get('Valor Matricula', 0) or 0))
+                st.divider()
+                st.subheader("Situação Acadêmica")
+                col_e, col_f = st.columns(2)
+                novo_data_mat = col_e.text_input("Data Matrícula", value=dados.get('Data da Matricula ', ''))
                 
-                c_g, c_h, c_i = st.columns(3)
+                try: val_mat = float(dados.get('Valor Matricula', 0))
+                except: val_mat = 0.0
+                novo_valor_mat = col_f.number_input("Valor Matrícula", value=val_mat)
+                
+                col_g, col_h, col_i = st.columns(3)
                 idx_doc = 0 if dados.get('Pendente Doc') != 'SIM' else 1
-                novo_pend = c_g.selectbox("Doc Pendente?", ["NÃO", "SIM"], index=idx_doc)
-                novo_qual = c_h.text_input("Qual Doc?", value=dados.get('Qual Documento?', ''))
+                novo_pend_doc = col_g.selectbox("Doc Pendente?", ["NÃO", "SIM"], index=idx_doc)
+                novo_qual_doc = col_h.text_input("Qual Doc?", value=dados.get('Qual Documento?', ''))
                 
-                ops_bolsa = ["NÃO", "SIM", "MEIA BOLSISTA"]
-                idx_bolsa = ops_bolsa.index(dados.get('Bolsista', 'NÃO')) if dados.get('Bolsista', 'NÃO') in ops_bolsa else 0
-                novo_bolsa = c_i.selectbox("Bolsista?", ops_bolsa, index=idx_bolsa)
+                lista_bolsa = ["NÃO", "SIM", "MEIA BOLSISTA"]
+                val_b = dados.get('Bolsista', 'NÃO')
+                idx_b = lista_bolsa.index(val_b) if val_b in lista_bolsa else 0
+                novo_bolsista = col_i.selectbox("Bolsista?", lista_bolsa, index=idx_b)
                 
-                novo_pag = st.text_input("Último Pagamento (Data)", value=dados.get('Data Ultimo Pagamento', ''))
+                st.divider()
+                novo_ult_pag = st.text_input("Data Último Pagamento", value=dados.get('Data Ultimo Pagamento', ''))
 
                 if st.form_submit_button("💾 Salvar Alterações"):
                     st.session_state.db_alunos.at[idx, 'Aluno'] = novo_nome
@@ -335,11 +325,11 @@ elif pagina == "👥 Lista de Alunos":
                     st.session_state.db_alunos.at[idx, 'Vencimento'] = novo_venc
                     st.session_state.db_alunos.at[idx, 'Mensalidade'] = novo_mensal
                     st.session_state.db_alunos.at[idx, 'Data da Matricula '] = novo_data_mat
-                    st.session_state.db_alunos.at[idx, 'Valor Matricula'] = novo_val_mat
-                    st.session_state.db_alunos.at[idx, 'Pendente Doc'] = novo_pend
-                    st.session_state.db_alunos.at[idx, 'Qual Documento?'] = novo_qual
-                    st.session_state.db_alunos.at[idx, 'Bolsista'] = novo_bolsa
-                    st.session_state.db_alunos.at[idx, 'Data Ultimo Pagamento'] = novo_pag
+                    st.session_state.db_alunos.at[idx, 'Valor Matricula'] = novo_valor_mat
+                    st.session_state.db_alunos.at[idx, 'Pendente Doc'] = novo_pend_doc
+                    st.session_state.db_alunos.at[idx, 'Qual Documento?'] = novo_qual_doc
+                    st.session_state.db_alunos.at[idx, 'Bolsista'] = novo_bolsista
+                    st.session_state.db_alunos.at[idx, 'Data Ultimo Pagamento'] = novo_ult_pag
                     
                     st.session_state.aluno_selecionado = novo_nome
                     st.success("Atualizado!")
@@ -348,36 +338,54 @@ elif pagina == "👥 Lista de Alunos":
         st.subheader("💳 Calendário Financeiro")
         tab25, tab26 = st.tabs(["Histórico 2025", "ANO 2026"])
 
-        # --- FUNÇÃO DE GRADE COM CORREÇÃO DE DUPLICIDADE ---
-        def render_grade(lista_meses, ano_ref):
-            cols = st.columns(4)
-            for i, mes in enumerate(lista_meses):
-                with cols[i % 4]:
+        # --- FUNÇÃO DE GRADE (CORRIGIDA COM "ANO") ---
+        def render_meses_grade(lista_meses, ano_referencia):
+            colunas = st.columns(4) 
+            
+            for index, mes in enumerate(lista_meses):
+                with colunas[index % 4]:
                     with st.container(border=True):
                         st.markdown(f"### {mes}")
+                        
                         df = st.session_state.db_fin[mes]
                         p_nome = str(st.session_state.aluno_selecionado).split()[0]
                         pg = df[df['Lançamento'].astype(str).str.contains(p_nome, case=False, na=False)]
                         
-                        # SUFIXO ÚNICO PARA CADA BOTÃO
-                        uid = f"{mes}_{ano_ref}"
-                        
+                        # --- ADICIONAMOS O ANO NO FINAL DAS 'KEYS' ---
                         if not pg.empty:
-                            v = pg.iloc[0]['Valor']
-                            st.markdown(f'<div class="pago-texto">✅ PAGO<br>R$ {v}</div>', unsafe_allow_html=True)
-                            if st.button("Desfazer", key=f"d_{uid}"):
+                            # PAGO
+                            valor = pg.iloc[0]['Valor']
+                            st.markdown('<p class="pago-texto">✅ PAGO</p>', unsafe_allow_html=True)
+                            st.write(f"**R$ {valor}**")
+                            # Key única: d_Janeiro_2026
+                            if st.button("Desfazer", key=f"d_{mes}_{ano_referencia}"):
                                 st.session_state.db_fin[mes] = df.drop(pg.index)
                                 st.rerun()
                         else:
-                            st.markdown('<div class="pendente-texto">❌ ABERTO</div>', unsafe_allow_html=True)
+                            # PENDENTE
+                            st.markdown('<p class="pendente-texto">❌ ABERTO</p>', unsafe_allow_html=True)
                             st.caption(f"Vence: {dados['Vencimento']}")
-                            with st.popover("Pagar"):
-                                val = st.number_input("R$", value=val_men, key=f"v_{uid}")
-                                if st.button("Confirmar", key=f"ok_{uid}"):
-                                    novo = {'Data': datetime.now().strftime('%d/%m/%Y'), 'Lançamento': f"Mensalidade {st.session_state.aluno_selecionado}", 'Valor': val, 'FORMA': 'PIX'}
+                            
+                            with st.popover("💰 Pagar"):
+                                # Keys únicas também para os inputs
+                                val = st.number_input("Valor", value=val_m, key=f"v_{mes}_{ano_referencia}")
+                                
+                                if st.button("Confirmar", key=f"ok_{mes}_{ano_referencia}"):
+                                    novo = {
+                                        'Data': datetime.now().strftime('%d/%m/%Y'), 
+                                        'Lançamento': f"Mensalidade {st.session_state.aluno_selecionado}", 
+                                        'Valor': val, 
+                                        'FORMA': 'PIX'
+                                    }
                                     st.session_state.db_fin[mes] = pd.concat([df, pd.DataFrame([novo])], ignore_index=True)
                                     st.rerun()
-                        st.write("")
+                        st.write("") 
 
-        with tab25: render_grade(st.session_state.m25, "25")
-        with tab26: render_grade(st.session_state.m26, "26")
+        # --- AQUI VOCÊ PASSA O ANO COMO PARÂMETRO ---
+        with tab25:
+            st.write("### 📅 Ano 2025")
+            render_meses_grade(st.session_state.m25, "2025") # Passando "2025"
+            
+        with tab26:
+            st.write("### 📅 Ano 2026")
+            render_meses_grade(st.session_state.m26, "2026") # Passando "2026"
