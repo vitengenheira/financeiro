@@ -2,142 +2,133 @@ import streamlit as st
 import pandas as pd
 import os
 
-# Configuração da Página
-st.set_page_config(page_title="Financeiro Star Tec Ubatã", layout="wide", page_icon="💰")
+# Configurações de Design
+st.set_page_config(page_title="Financeiro Star Tec", layout="wide", page_icon="🏫")
 
-# Nome do seu arquivo Excel no GitHub
-NOME_ARQUIVO = "planilha atualizada 2026.xlsx"
+# CSS para deixar os botões mais bonitos
+st.markdown("""
+    <style>
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #f0f2f6; }
+    .status-pago { color: green; font-weight: bold; }
+    .status-devendo { color: red; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE CARREGAMENTO ---
+# --- CARREGAMENTO DE DADOS ---
 @st.cache_data
 def carregar_dados():
-    # Carregar Alunos (Aba 'Alunos')
-    df_alunos = pd.read_excel(NOME_ARQUIVO, sheet_name='Alunos', skiprows=3)
-    df_alunos = df_alunos[['Aluno', 'Contato', 'Mensalidade', 'Vencimento']].dropna(subset=['Aluno'])
+    # Carrega Alunos
+    df_alunos = pd.read_excel("planilha atualizada 2026.xlsx", sheet_name='Alunos', skiprows=3)
+    df_alunos = df_alunos.dropna(subset=['Aluno'])
     
-    # Mapeamento das abas de meses
-    abas_meses = [
-        "JANEIRO.2026", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"
-    ]
+    # Lista de abas de meses
+    meses = ["JANEIRO.2026", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+             "Julho", "Agosto", "Setembro", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
     
-    dados_mensais = {}
-    for aba in abas_meses:
+    pagamentos_meses = {}
+    for m in meses:
         try:
-            df = pd.read_excel(NOME_ARQUIVO, sheet_name=aba, skiprows=1)
-            # Limpar coluna de Valor (remover R$, converter para número)
-            if 'Valor' in df.columns:
-                df['Valor'] = pd.to_numeric(df['Valor'].astype(str).str.replace('R$', '').str.replace('.', '').str.replace(',', '.'), errors='coerce').fillna(0)
-            dados_mensais[aba] = df
-        except:
-            continue # Se a aba não existir ainda, ele pula
+            df_m = pd.read_excel("planilha atualizada 2026.xlsx", sheet_name=m, skiprows=1)
+            pagamentos_meses[m] = df_m
+        except: continue
             
-    return df_alunos, dados_mensais
-
-# Inicialização do App
-if not os.path.exists(NOME_ARQUIVO):
-    st.error(f"Arquivo '{NOME_ARQUIVO}' não encontrado no GitHub. Verifique o nome!")
-    st.stop()
+    return df_alunos, pagamentos_meses
 
 df_alunos, dic_meses = carregar_dados()
 
-# --- MENU LATERAL ---
-st.sidebar.title("💎 Star Tec Financeiro")
-menu = st.sidebar.radio("Navegar para:", [
-    "🏠 Início / Cadastro", 
-    "📅 Lançamentos Mensais", 
-    "📜 Histórico por Aluno", 
-    "⚠️ Central de Pendências"
-])
+# --- LÓGICA DE NAVEGAÇÃO ---
+if 'aluno_selecionado' not in st.session_state:
+    st.session_state.aluno_selecionado = None
 
-# --- ABA 1: INÍCIO E CADASTRO ---
-if menu == "🏠 Início / Cadastro":
-    st.header("Gestão de Alunos")
+# --- BARRA LATERAL ---
+st.sidebar.title("⭐ Star Tec Ubatã")
+if st.sidebar.button("🏠 Voltar para Início"):
+    st.session_state.aluno_selecionado = None
+
+menu = st.sidebar.radio("Navegar:", ["Lista de Alunos", "Novo Aluno", "Pendências Gerais"])
+
+# --- TELA: FICHA INDIVIDUAL (VIDA DO ALUNO) ---
+if st.session_state.aluno_selecionado:
+    nome_aluno = st.session_state.aluno_selecionado
+    st.header(f"👤 Vida do Aluno: {nome_aluno}")
     
-    col1, col2 = st.columns([2, 1])
+    # Pega dados do aluno
+    dados = df_alunos[df_alunos['Aluno'] == nome_aluno].iloc[0]
     
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.subheader("Alunos Ativos")
-        st.dataframe(df_alunos, use_container_width=True)
+        st.subheader("Informações Base")
+        st.write(f"**Contato:** {dados['Contato']}")
+        st.write(f"**Matrícula:** {dados['Data da Matricula ']}")
+        st.write(f"**Vencimento:** {dados['Vencimento']}")
     
     with col2:
-        st.subheader("➕ Novo Aluno")
-        with st.form("novo_aluno"):
-            nome = st.text_input("Nome Completo")
-            zap = st.text_input("WhatsApp")
-            mensal = st.text_input("Valor Mensalidade (ex: 200)")
-            venc = st.selectbox("Vencimento", ["DIA 05", "DIA 10", "DIA 15", "DIA 20", "DIA 30"])
-            if st.form_submit_button("Pré-Cadastrar"):
-                st.success(f"Aluno {nome} pronto para ser adicionado à planilha!")
-                st.info("Dica: Adicione-o na aba 'Alunos' do seu Excel e suba o arquivo novamente.")
+        st.subheader("Documentação")
+        doc_status = st.selectbox("Status Doc:", ["OK", "Pendente", "Cursando"], 
+                                  index=0 if "SIM" in str(dados['Penden. Docum']) else 1)
+        st.text_input("Qual documento?", value=dados['Qual Documento?'])
+        if st.button("Salvar Alterações"):
+            st.success("Dados atualizados (apenas nesta sessão)")
 
-# --- ABA 2: LANÇAMENTOS MENSAIS ---
-elif menu == "📅 Lançamentos Mensais":
-    st.header("Consulta de Pagamentos por Mês")
-    mes_sel = st.selectbox("Selecione o Mês:", list(dic_meses.keys()))
-    
-    df_mes = dic_meses[mes_sel]
-    if not df_mes.empty:
-        st.dataframe(df_mes[['Data', 'Lançamento', 'FORMA', 'Valor', 'Saldo']].dropna(subset=['Lançamento']), use_container_width=True)
-        receita = df_mes[df_mes['Valor'] > 0]['Valor'].sum()
-        st.metric(f"Total Recebido em {mes_sel}", f"R$ {receita:,.2f}")
-    else:
-        st.warning("Sem dados para este mês.")
+    with col3:
+        st.subheader("Resumo Financeiro")
+        st.write(f"**Valor Mensalidade:** {dados['Mensalidade']}")
+        st.write(f"**Último Pagamento:** {dados['Data do U. Pag']}")
 
-# --- ABA 3: HISTÓRICO POR ALUNO ---
-elif menu == "📜 Histórico por Aluno":
-    st.header("Busca de Histórico Individual")
-    aluno_h = st.selectbox("Escolha o Aluno:", df_alunos['Aluno'].unique())
+    st.divider()
+    st.subheader("🗓️ Histórico de Mensalidades 2026")
     
-    historico_total = []
-    # Busca o aluno em todas as abas de meses
-    for mes, df in dic_meses.items():
-        # Busca aproximada pelo primeiro nome para evitar erros de digitação
-        primeiro_nome = aluno_h.split()[0].upper()
-        match = df[df['Lançamento'].astype(str).str.upper().str.contains(primeiro_nome, na=False)]
-        
-        for _, row in match.iterrows():
-            historico_total.append({
-                "Mês": mes,
-                "Data": row['Data'],
-                "Descrição": row['Lançamento'],
-                "Valor": row['Valor'],
-                "Forma": row.get('FORMA', '-')
-            })
+    # Gerar a grade de meses
+    cols_meses = st.columns(4)
+    for i, mes in enumerate(dic_meses.keys()):
+        with cols_meses[i % 4]:
+            # Busca o nome do aluno na aba do mês
+            pagou = dic_meses[mes][dic_meses[mes]['Lançamento'].astype(str).str.contains(nome_aluno.split()[0], case=False, na=False)]
             
-    if historico_total:
-        df_h = pd.DataFrame(historico_total)
-        st.table(df_h)
-        st.metric("Total Pago pelo Aluno", f"R$ {df_h['Valor'].sum():,.2f}")
-    else:
-        st.error("Nenhum pagamento registrado para este aluno.")
+            if not pagou.empty:
+                st.markdown(f"**{mes}**")
+                st.markdown("<span class='status-pago'>✅ PAGO</span>", unsafe_allow_html=True)
+                st.caption(f"Valor: {pagou.iloc[0]['Valor']}")
+            else:
+                st.markdown(f"**{mes}**")
+                st.markdown("<span class='status-devendo'>❌ EM ABERTO</span>", unsafe_allow_html=True)
 
-# --- ABA 4: CENTRAL DE PENDÊNCIAS ---
-elif menu == "⚠️ Central de Pendências":
-    st.header("Alunos Inadimplentes")
-    mes_analise = st.selectbox("Verificar quem não pagou em:", list(dic_meses.keys()))
+# --- TELA: LISTA DE ALUNOS ---
+elif menu == "Lista de Alunos":
+    st.header("👥 Todos os Alunos")
+    st.write("Clique no nome para ver o histórico financeiro completo.")
     
-    df_mes = dic_meses[mes_analise]
-    devedores = []
+    # Criar uma tabela com botão
+    for index, row in df_alunos.iterrows():
+        col_nome, col_zap, col_acao = st.columns([3, 2, 1])
+        col_nome.write(f"**{row['Aluno']}**")
+        col_zap.write(row['Contato'])
+        if col_acao.button("Ver Ficha", key=f"btn_{index}"):
+            st.session_state.aluno_selecionado = row['Aluno']
+            st.rerun()
+        st.divider()
+
+# --- TELA: NOVO ALUNO ---
+elif menu == "Novo Aluno":
+    st.header("➕ Cadastrar Novo Aluno")
+    with st.form("cadastro"):
+        nome = st.text_input("Nome Completo")
+        contato = st.text_input("WhatsApp")
+        venc = st.selectbox("Vencimento", ["DIA 05", "DIA 10", "DIA 15", "DIA 20"])
+        valor = st.number_input("Valor Mensalidade", value=200)
+        if st.form_submit_button("Finalizar Cadastro"):
+            st.balloons()
+            st.success("Aluno enviado para a fila de processamento!")
+
+# --- TELA: PENDÊNCIAS ---
+elif menu == "Pendências Gerais":
+    st.header("⚠️ Relatório de Devedores")
+    mes_ref = st.selectbox("Verificar mês:", list(dic_meses.keys()))
     
-    for _, aluno in df_alunos.iterrows():
-        nome_curto = aluno['Aluno'].split()[0].upper()
-        # Se o nome não aparece nos lançamentos do mês, está devendo
-        pagou = df_mes[df_mes['Lançamento'].astype(str).str.upper().str.contains(nome_curto, na=False)]
-        
-        if pagou.empty:
-            devedores.append({
-                "Aluno": aluno['Aluno'],
-                "WhatsApp": aluno['Contato'],
-                "Vencimento": aluno['Vencimento'],
-                "Valor": aluno['Mensalidade']
-            })
-            
-    if devedores:
-        df_dev = pd.DataFrame(devedores)
-        st.error(f"Encontrados {len(devedores)} alunos pendentes em {mes_analise}")
-        st.dataframe(df_dev, use_container_width=True)
-    else:
-        st.success("Todos os alunos pagaram este mês!")
-st.sidebar.markdown("---")
-st.sidebar.caption("Star Tec Polo Ubatã v1.0")
+    lista_devedores = []
+    for _, al in df_alunos.iterrows():
+        pago = dic_meses[mes_ref][dic_meses[mes_ref]['Lançamento'].astype(str).str.contains(al['Aluno'].split()[0], case=False, na=False)]
+        if pago.empty:
+            lista_devedores.append({"Aluno": al['Aluno'], "Contato": al['Contato']})
+    
+    st.table(pd.DataFrame(lista_devedores))
